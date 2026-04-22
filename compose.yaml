@@ -3,6 +3,33 @@ x-host-service: &host_service
   restart: unless-stopped
 
 services:
+  admin-ui:
+    <<: *host_service
+    build:
+      context: .
+      dockerfile: docker/admin-ui/Dockerfile
+    working_dir: /workspace
+    command:
+      - python
+      - -m
+      - uvicorn
+      - admin_server.app:app
+      - --host
+      - 127.0.0.1
+      - --port
+      - "${ADMIN_UI_PORT}"
+      - --reload
+      - --reload-dir
+      - /workspace/admin_server
+    environment:
+      PYTHONUNBUFFERED: "1"
+      WORKSPACE_DIR: /workspace
+      HOST_PROC_ASOUND: /host/proc/asound
+    volumes:
+      - .:/workspace:rw
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /proc/asound:/host/proc/asound:ro
+
   ssl-game-controller:
     <<: *host_service
     image: robocupssl/ssl-game-controller:${SSL_GAME_CONTROLLER_TAG}
@@ -123,5 +150,6 @@ services:
       VISION_ADDRESS: ${VISION_ADDRESS}
       VISION_PORT: ${VISION_PORT}
       AUDIOREF_PACK_DIR: ${AUDIOREF_PACK_DIR}
+      AUDIOREF_OUTPUT_PCM: ${AUDIOREF_OUTPUT_PCM}
       AUDIOREF_MAX_QUEUE_LEN: ${AUDIOREF_MAX_QUEUE_LEN}
       AUDIOREF_ANTI_STANDBY_SOUND: ${AUDIOREF_ANTI_STANDBY_SOUND}

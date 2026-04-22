@@ -21,7 +21,7 @@ usage() {
 Usage: ./scripts/ops.sh <command> [service...]
 
 Commands:
-  build    Build local images (AudioRef)
+  build    Build local images (admin-ui, AudioRef)
   pull     Pull upstream images
   up       Start the stack in detached mode
   down     Stop and remove the stack

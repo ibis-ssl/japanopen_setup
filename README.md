@@ -2,6 +2,8 @@
 
 RoboCup Japan Open の SSL 運営PC向けに、試合制御まわりを `docker compose` でまとめて扱うためのリポジトリです。対象は `ssl-game-controller`、`ssl-vision-client`、`ssl-status-board`、両色の `ssl-remote-control`、TIGERs / ER-Force の dual AutoRef、`ssl-auto-recorder`、`AudioRef` です。`ssl-vision` 本体とカメラ設定はこのリポジトリの管理対象に含めません。
 
+ローカルの管理画面 `admin-ui` も含み、各 Web UI をページ内タブで切り替えながら確認できます。設定タブから `AudioRef` の出力先も変更できます。
+
 ## Requirements
 
 - Docker Engine と Docker Compose plugin
@@ -14,6 +16,7 @@ RoboCup Japan Open の SSL 運営PC向けに、試合制御まわりを `docker 
 - `.env.example`: 既定のイメージタグとポート設定
 - `config/ssl-game-controller.yaml`: GC の本番設定
 - `config/engine.yaml`: チーム名と event behavior の初期値
+- `admin_server/`, `admin_web/`, `docker/admin-ui/`: 管理画面
 - `docker/audioref/`: AudioRef 用ローカルイメージ
 - `scripts/ops.sh`: 日常運用ラッパ
 
@@ -50,6 +53,7 @@ RoboCup Japan Open の SSL 運営PC向けに、試合制御まわりを `docker 
 | `ssl-status-board` | 状態表示 | <http://localhost:8083> |
 | `ssl-remote-control-yellow` | Yellow 側の remote control | <http://localhost:8084> |
 | `ssl-remote-control-blue` | Blue 側の remote control | <http://localhost:8085> |
+| `admin-ui` | 運営向けメイン管理画面 | <http://127.0.0.1:8080> |
 | `autoref-tigers` | TIGERs AutoRef | tracker publish source |
 | `autoref-erforce` | ER-Force AutoRef | tracker publish source |
 | `ssl-auto-recorder` | 公式ログの自動記録 | `data/logs/auto-recorder/` |
@@ -70,8 +74,17 @@ RoboCup Japan Open の SSL 運営PC向けに、試合制御まわりを `docker 
 既定値では英語パック `sounds/en` を使います。必要なら `.env` で以下を調整できます。
 
 - `AUDIOREF_PACK_DIR`
+- `AUDIOREF_OUTPUT_PCM`
 - `AUDIOREF_MAX_QUEUE_LEN`
 - `AUDIOREF_ANTI_STANDBY_SOUND`
+
+`AUDIOREF_OUTPUT_PCM` は既定で `default` です。管理画面の設定タブから `plughw:<card>,<device>` 形式の候補を選ぶと `.env` に保存され、`audioref` コンテナを再作成して反映します。
+
+## Admin UI
+
+`admin-ui` は repo を bind mount した状態で起動し、`admin_server/` の Python コードは `uvicorn --reload` で自動再読み込みされます。フロントエンドの `admin_web/` は静的配信なので、HTML/CSS/JS の変更もブラウザ再読込だけで反映されます。
+
+`./scripts/ops.sh build` は `admin-ui` と `AudioRef` のローカルイメージをビルドします。
 
 ## Data
 
