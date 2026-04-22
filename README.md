@@ -78,7 +78,7 @@ RoboCup Japan Open の SSL 運営PC向けに、試合制御まわりを `docker 
 - `AUDIOREF_MAX_QUEUE_LEN`
 - `AUDIOREF_ANTI_STANDBY_SOUND`
 
-`AUDIOREF_OUTPUT_PCM` は既定で `default` です。管理画面の設定タブから `plughw:<card>,<device>` 形式の候補を選ぶと `.env` に保存され、`audioref` コンテナを再作成して反映します。
+`AUDIOREF_OUTPUT_PCM` は既定で `default` です。`default` はコンテナ内で playback PCM を自動検出し、Analog / Speaker 系を優先し、見つからなければ最初の playback PCM を使います。管理画面の設定タブから `plughw:<card>,<device>` 形式の候補を選ぶと `.env` に保存され、`audioref` コンテナを再作成して反映します。
 
 ## Admin UI
 

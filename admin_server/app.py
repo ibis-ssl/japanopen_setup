@@ -319,7 +319,7 @@ def parse_playback_outputs() -> list[dict[str, Any]]:
     outputs: list[dict[str, Any]] = [
         {
             "value": "default",
-            "label": "System default",
+            "label": "Auto detect (recommended)",
             "cardIndex": None,
             "deviceIndex": None,
             "cardId": None,

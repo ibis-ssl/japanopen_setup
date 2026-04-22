@@ -155,7 +155,7 @@ function createSettingsPanel() {
     <div class="settings-layout">
       <section class="settings-card">
         <h3>AudioRef Output</h3>
-        <p>一覧はホストの <code>/proc/asound</code> から生成しています。<code>default</code> はホスト既定の出力先を使います。</p>
+        <p>一覧はホストの <code>/proc/asound</code> から生成しています。<code>default</code> は Analog / Speaker 系を優先し、無ければ最初の playback PCM を自動選択します。</p>
         <form id="audioref-form">
           <div class="form-grid">
             <div>
