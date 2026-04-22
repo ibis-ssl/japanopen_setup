@@ -136,6 +136,7 @@ services:
 
   audioref:
     <<: *host_service
+    stop_signal: SIGINT
     build:
       context: .
       dockerfile: docker/audioref/Dockerfile
