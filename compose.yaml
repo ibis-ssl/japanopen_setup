@@ -1,0 +1,127 @@
+x-host-service: &host_service
+  network_mode: host
+  restart: unless-stopped
+
+services:
+  ssl-game-controller:
+    <<: *host_service
+    image: robocupssl/ssl-game-controller:${SSL_GAME_CONTROLLER_TAG}
+    command:
+      - -visionAddress
+      - ${VISION_ADDRESS}:${VISION_PORT}
+      - -trackerAddress
+      - ${TRACKER_ADDRESS}:${TRACKER_PORT}
+      - -publishAddress
+      - ${REFEREE_ADDRESS}:${REFEREE_PORT}
+      - -address
+      - :${GC_UI_PORT}
+    volumes:
+      - ./config:/config:ro
+      - ./data/gc:/data:rw
+
+  ssl-vision-client:
+    <<: *host_service
+    image: robocupssl/ssl-vision-client:${SSL_VISION_CLIENT_TAG}
+    command:
+      - -address
+      - :${VISION_CLIENT_UI_PORT}
+      - -visionAddress
+      - ${VISION_ADDRESS}:${VISION_PORT}
+      - -trackedAddress
+      - ${TRACKER_ADDRESS}:${TRACKER_PORT}
+      - -refereeAddress
+      - ${REFEREE_ADDRESS}:${REFEREE_PORT}
+
+  ssl-status-board:
+    <<: *host_service
+    image: robocupssl/ssl-status-board:${SSL_STATUS_BOARD_TAG}
+    command:
+      - -address
+      - :${STATUS_BOARD_UI_PORT}
+      - -refereeAddress
+      - ${REFEREE_ADDRESS}:${REFEREE_PORT}
+
+  ssl-remote-control-yellow:
+    <<: *host_service
+    image: robocupssl/ssl-remote-control:${SSL_REMOTE_CONTROL_TAG}
+    command:
+      - -address
+      - :${REMOTE_CONTROL_YELLOW_UI_PORT}
+      - -refereeAddress
+      - ${REFEREE_ADDRESS}:${REFEREE_PORT}
+      - -team
+      - YELLOW
+
+  ssl-remote-control-blue:
+    <<: *host_service
+    image: robocupssl/ssl-remote-control:${SSL_REMOTE_CONTROL_TAG}
+    command:
+      - -address
+      - :${REMOTE_CONTROL_BLUE_UI_PORT}
+      - -refereeAddress
+      - ${REFEREE_ADDRESS}:${REFEREE_PORT}
+      - -team
+      - BLUE
+
+  autoref-tigers:
+    <<: *host_service
+    image: tigersmannheim/auto-referee:${TIGERS_AUTOREF_TAG}
+    command:
+      - -a
+      - -hl
+      - --visionAddress
+      - ${VISION_ADDRESS}:${VISION_PORT}
+      - --refereeAddress
+      - ${REFEREE_ADDRESS}:${REFEREE_PORT}
+      - --trackerAddress
+      - ${TRACKER_ADDRESS}:${TRACKER_PORT}
+
+  autoref-erforce:
+    <<: *host_service
+    image: roboticserlangen/autoref:${ERFORCE_AUTOREF_TAG}
+    command:
+      - --vision-port
+      - ${VISION_PORT}
+      - --tracker-port
+      - ${TRACKER_PORT}
+      - --gc-port
+      - ${REFEREE_PORT}
+
+  ssl-auto-recorder:
+    <<: *host_service
+    image: robocupssl/ssl-auto-recorder:${SSL_AUTO_RECORDER_TAG}
+    stop_signal: SIGINT
+    stop_grace_period: 30s
+    working_dir: /logs
+    command:
+      - -output-folder
+      - /logs
+      - -referee-address
+      - ${REFEREE_ADDRESS}:${REFEREE_PORT}
+      - -vision-address
+      - ${VISION_ADDRESS}:${VISION_PORT}
+      - -vision-tracker-address
+      - ${TRACKER_ADDRESS}:${TRACKER_PORT}
+      - -vision-legacy-enabled=false
+      - -http-serve=false
+    volumes:
+      - ./data/logs/auto-recorder:/logs:rw
+
+  audioref:
+    <<: *host_service
+    build:
+      context: .
+      dockerfile: docker/audioref/Dockerfile
+      args:
+        AUDIOREF_REF: ${AUDIOREF_REF}
+    image: japanopen-ssl/audioref:${AUDIOREF_REF}
+    devices:
+      - /dev/snd:/dev/snd
+    environment:
+      REFEREE_ADDRESS: ${REFEREE_ADDRESS}
+      REFEREE_PORT: ${REFEREE_PORT}
+      VISION_ADDRESS: ${VISION_ADDRESS}
+      VISION_PORT: ${VISION_PORT}
+      AUDIOREF_PACK_DIR: ${AUDIOREF_PACK_DIR}
+      AUDIOREF_MAX_QUEUE_LEN: ${AUDIOREF_MAX_QUEUE_LEN}
+      AUDIOREF_ANTI_STANDBY_SOUND: ${AUDIOREF_ANTI_STANDBY_SOUND}

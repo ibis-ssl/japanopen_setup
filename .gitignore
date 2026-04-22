@@ -1,0 +1,12 @@
+.env
+data/gc/state-store.json.stream
+data/gc/trusted_keys/*
+!data/gc/trusted_keys/
+!data/gc/trusted_keys/auto_ref/
+!data/gc/trusted_keys/team/
+!data/gc/trusted_keys/remote-control/
+!data/gc/trusted_keys/auto_ref/.gitkeep
+!data/gc/trusted_keys/team/.gitkeep
+!data/gc/trusted_keys/remote-control/.gitkeep
+data/logs/auto-recorder/*
+!data/logs/auto-recorder/.gitkeep
