@@ -3,12 +3,14 @@ const state = {
   services: [],
   settings: null,
   outputs: [],
-  activeTab: 'overview',
+  activeTab: 'game-controller',
   settingsBusy: false,
 };
 
 const tabRail = document.getElementById('tab-rail');
 const panelStack = document.getElementById('panel-stack');
+const topbarTitle = document.getElementById('topbar-panel-title');
+const topbarActions = document.getElementById('topbar-actions');
 const metricRunning = document.getElementById('metric-running');
 const metricTotal = document.getElementById('metric-total');
 const serviceError = document.getElementById('service-error');
@@ -25,9 +27,42 @@ const statusLabels = {
   unknown: 'Unknown',
 };
 
+function getVisibleTabs() {
+  return state.tabs.filter((t) => t.id !== 'overview');
+}
+
+function getTabFromHash() {
+  return window.location.hash.replace(/^#/, '') || 'game-controller';
+}
+
+function updateTopbar() {
+  const tabId = state.activeTab;
+  if (tabId === 'settings') {
+    const audioref = state.services.find((s) => s.id === 'audioref');
+    topbarTitle.textContent = 'Settings';
+    topbarActions.innerHTML = `
+      <span class="status-pill" data-state="${audioref?.state ?? 'unknown'}">
+        ${audioref ? `AudioRef: ${formatState(audioref.state)}` : 'AudioRef: Unknown'}
+      </span>
+    `;
+    return;
+  }
+  const service = serviceByTab(tabId);
+  if (!service) {
+    topbarTitle.textContent = '';
+    topbarActions.innerHTML = '';
+    return;
+  }
+  topbarTitle.textContent = service.label;
+  topbarActions.innerHTML = `
+    <span class="status-pill" data-state="${service.state}">${formatState(service.state)}</span>
+    <a class="ghost-link" href="${service.url}" target="_blank" rel="noreferrer">Open directly</a>
+  `;
+}
+
 function setActiveTab(tabId) {
-  const validTabIds = new Set(state.tabs.map((tab) => tab.id));
-  const safeTabId = validTabIds.has(tabId) ? tabId : 'overview';
+  const validTabIds = new Set(getVisibleTabs().map((tab) => tab.id));
+  const safeTabId = validTabIds.has(tabId) ? tabId : 'game-controller';
 
   state.activeTab = safeTabId;
   if (window.location.hash !== `#${safeTabId}`) {
@@ -39,6 +74,7 @@ function setActiveTab(tabId) {
   for (const panel of panelStack.querySelectorAll('.panel')) {
     panel.classList.toggle('is-active', panel.dataset.panelId === safeTabId);
   }
+  updateTopbar();
 }
 
 function serviceByTab(tabId) {
@@ -46,9 +82,6 @@ function serviceByTab(tabId) {
 }
 
 function serviceLabelForTab(tabId) {
-  if (tabId === 'overview') {
-    return '';
-  }
   if (tabId === 'settings') {
     return state.services.find((service) => service.id === 'audioref')?.state ?? '';
   }
@@ -77,7 +110,7 @@ function createTabButton(tab) {
 
 function renderTabRail() {
   if (!tabRail.children.length) {
-    for (const tab of state.tabs) {
+    for (const tab of getVisibleTabs()) {
       tabRail.appendChild(createTabButton(tab));
     }
   }
@@ -90,47 +123,20 @@ function renderTabRail() {
   }
 }
 
-function createOverviewPanel() {
-  const panel = document.createElement('section');
-  panel.className = 'panel';
-  panel.dataset.panelId = 'overview';
-  panel.innerHTML = `
-    <div class="panel__header">
-      <div>
-        <h2 class="panel__title">Overview</h2>
-        <p class="panel__copy">
-          Web UI の起動状態、バックグラウンドサービスの状況、直接オープン用リンクを一覧します。
-        </p>
-      </div>
-    </div>
-    <div class="overview-grid" id="overview-grid"></div>
-  `;
-  return panel;
-}
-
 function createEmbedPanel(tab) {
   const service = serviceByTab(tab.id);
   const panel = document.createElement('section');
   panel.className = 'panel';
   panel.dataset.panelId = tab.id;
   panel.dataset.serviceId = service.id;
+  const running = isServiceRunning(service);
   panel.innerHTML = `
-    <div class="panel__header">
-      <div>
-        <h2 class="panel__title">${service.label}</h2>
-        <p class="panel__copy">${service.summary}</p>
-      </div>
-      <div class="pill-row">
-        <span class="status-pill" data-role="status-pill"></span>
-        <a class="ghost-link" data-role="open-link" href="${service.url}" target="_blank" rel="noreferrer">Open directly</a>
-      </div>
-    </div>
-    <div class="embed-shell" data-role="embed-shell" data-running="${String(isServiceRunning(service))}">
-      <div class="embed-shell__overlay">
-        <strong data-role="overlay-title"></strong>
-        <p data-role="overlay-copy"></p>
-      </div>
+    <div class="embed-shell" data-role="embed-shell" data-running="${String(running)}">
       <iframe title="${service.label}" src="${service.url}" loading="lazy"></iframe>
+      <div class="embed-state" data-role="embed-state"${running ? ' hidden' : ''}>
+        <strong data-role="state-title"></strong>
+        <p data-role="state-copy"></p>
+      </div>
     </div>
   `;
   return panel;
@@ -141,21 +147,10 @@ function createSettingsPanel() {
   panel.className = 'panel';
   panel.dataset.panelId = 'settings';
   panel.innerHTML = `
-    <div class="panel__header">
-      <div>
-        <h2 class="panel__title">Settings</h2>
-        <p class="panel__copy">
-          AudioRef の ALSA 出力先を <code>.env</code> に保存し、対象コンテナだけを再作成して反映します。
-        </p>
-      </div>
-      <div class="pill-row">
-        <span class="status-pill" data-role="settings-status"></span>
-      </div>
-    </div>
-    <div class="settings-layout">
+    <div class="panel__body">
       <section class="settings-card">
         <h3>AudioRef Output</h3>
-        <p>一覧はホストの <code>/proc/asound</code> から生成しています。<code>default</code> は Analog / Speaker 系を優先し、無ければ最初の playback PCM を自動選択します。</p>
+        <p>一覧はホストの <code>/proc/asound</code> から生成しています。<code>default</code> はホスト既定の出力先を使います。</p>
         <form id="audioref-form">
           <div class="form-grid">
             <div>
@@ -171,20 +166,6 @@ function createSettingsPanel() {
         </form>
         <div class="flash" id="settings-flash" hidden></div>
       </section>
-      <aside class="settings-side">
-        <h3>Notes</h3>
-        <p>SimpleAudio 自体は出力デバイス選択 API を持たないため、コンテナ内の ALSA 既定 PCM を差し替えて制御します。</p>
-        <div class="inline-list">
-          <div class="inline-item">
-            <strong>Save target</strong>
-            <code>.env</code> に <code>AUDIOREF_OUTPUT_PCM</code> を保存します。<code>.env</code> が無い場合は <code>.env.example</code> を元に作成します。
-          </div>
-          <div class="inline-item">
-            <strong>Apply path</strong>
-            <code>./scripts/ops.sh up --force-recreate audioref</code> 相当で <code>audioref</code> だけを再作成します。
-          </div>
-        </div>
-      </aside>
     </div>
   `;
 
@@ -198,55 +179,12 @@ function renderPanels() {
     return;
   }
 
-  for (const tab of state.tabs) {
-    if (tab.id === 'overview') {
-      panelStack.appendChild(createOverviewPanel());
-      continue;
-    }
+  for (const tab of getVisibleTabs()) {
     if (tab.id === 'settings') {
       panelStack.appendChild(createSettingsPanel());
       continue;
     }
     panelStack.appendChild(createEmbedPanel(tab));
-  }
-}
-
-function renderOverview() {
-  const grid = document.getElementById('overview-grid');
-  if (!grid) {
-    return;
-  }
-
-  grid.innerHTML = '';
-  for (const service of state.services) {
-    const card = document.createElement('article');
-    card.className = 'service-card';
-    const actionLink = service.url
-      ? `<a class="ghost-link" href="${service.url}" target="_blank" rel="noreferrer">Open</a>`
-      : '';
-    const inlineTab = service.tabId
-      ? `<button class="ghost-button" type="button" data-jump-tab="${service.tabId}">View Here</button>`
-      : '';
-
-    card.innerHTML = `
-      <div class="service-card__header">
-        <div>
-          <h3>${service.label}</h3>
-          <p class="service-card__summary">${service.summary}</p>
-        </div>
-        <span class="status-pill" data-state="${service.state}">${formatState(service.state)}</span>
-      </div>
-      <div class="service-card__footer">
-        ${actionLink}
-        ${inlineTab}
-      </div>
-    `;
-
-    const jumpButton = card.querySelector('[data-jump-tab]');
-    if (jumpButton) {
-      jumpButton.addEventListener('click', () => setActiveTab(service.tabId));
-    }
-    grid.appendChild(card);
   }
 }
 
@@ -257,24 +195,18 @@ function updateEmbedPanels() {
       continue;
     }
 
-    const pill = panel.querySelector('[data-role="status-pill"]');
-    pill.dataset.state = service.state;
-    pill.textContent = formatState(service.state);
-
-    const link = panel.querySelector('[data-role="open-link"]');
-    link.href = service.url;
+    const running = isServiceRunning(service);
 
     const shell = panel.querySelector('[data-role="embed-shell"]');
-    shell.dataset.running = String(isServiceRunning(service));
+    shell.dataset.running = String(running);
 
-    const overlayTitle = panel.querySelector('[data-role="overlay-title"]');
-    const overlayCopy = panel.querySelector('[data-role="overlay-copy"]');
-    if (isServiceRunning(service)) {
-      overlayTitle.textContent = 'Inline view is active.';
-      overlayCopy.textContent = '表示されない場合は Open directly を使ってください。埋め込み拒否のある UI もあります。';
-    } else {
-      overlayTitle.textContent = `Service is ${formatState(service.state).toLowerCase()}.`;
-      overlayCopy.textContent = service.statusText || 'まだコンテナが作成されていません。';
+    const embedState = panel.querySelector('[data-role="embed-state"]');
+    embedState.hidden = running;
+    if (!running) {
+      embedState.querySelector('[data-role="state-title"]').textContent =
+        `Service is ${formatState(service.state).toLowerCase()}.`;
+      embedState.querySelector('[data-role="state-copy"]').textContent =
+        service.statusText || 'まだコンテナが作成されていません。';
     }
   }
 }
@@ -294,11 +226,6 @@ function renderSettings() {
   if (!panel || !state.settings) {
     return;
   }
-
-  const audioref = state.services.find((service) => service.id === 'audioref');
-  const status = panel.querySelector('[data-role="settings-status"]');
-  status.dataset.state = audioref?.state ?? 'unknown';
-  status.textContent = audioref ? `AudioRef: ${formatState(audioref.state)}` : 'AudioRef: Unknown';
 
   const select = panel.querySelector('#output-pcm');
   const help = panel.querySelector('#output-help');
@@ -373,8 +300,8 @@ async function refreshAll({ flash = false } = {}) {
 
   renderTabRail();
   renderPanels();
-  renderOverview();
   updateEmbedPanels();
+  updateTopbar();
   renderSettings();
   renderSummary();
   renderError(servicesPayload.summary);
@@ -410,15 +337,13 @@ async function handleSettingsSubmit(event) {
 }
 
 window.addEventListener('hashchange', () => {
-  const nextTab = window.location.hash.replace(/^#/, '') || 'overview';
-  setActiveTab(nextTab);
+  setActiveTab(getTabFromHash());
 });
 
 async function bootstrap() {
   try {
     await refreshAll();
-    const initialTab = window.location.hash.replace(/^#/, '') || 'overview';
-    setActiveTab(initialTab);
+    setActiveTab(getTabFromHash());
     window.setInterval(() => {
       refreshAll().catch((error) => {
         renderError({ error: error.message });

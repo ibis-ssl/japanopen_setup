@@ -8,28 +8,27 @@
 </head>
 <body>
   <div class="shell">
-    <header class="hero">
-      <div class="hero__eyebrow">Japan Open SSL Operations</div>
-      <div class="hero__main">
-        <div>
-          <h1>Control Deck</h1>
-          <p class="hero__copy">
-            運営用の主要 UI を 1 画面に集約し、サービス状態確認と AudioRef の出力先切替をまとめて扱います。
-          </p>
-        </div>
-        <div class="hero__status">
-          <div class="metric">
-            <span class="metric__label">Running</span>
+    <header class="topbar">
+      <div class="topbar__left">
+        <span class="topbar__app">Japan Open Control Deck</span>
+        <span class="topbar__sep" aria-hidden="true">/</span>
+        <h1 class="topbar__panel-title" id="topbar-panel-title"></h1>
+      </div>
+      <div class="topbar__right">
+        <div class="pill-row" id="topbar-actions"></div>
+        <div class="topbar__metrics">
+          <div class="metric-chip">
+            <span>Running</span>
             <strong id="metric-running">0</strong>
           </div>
-          <div class="metric">
-            <span class="metric__label">Services</span>
+          <div class="metric-chip">
+            <span>Total</span>
             <strong id="metric-total">0</strong>
           </div>
         </div>
       </div>
-      <div class="hero__notice" id="service-error" hidden></div>
     </header>
+    <div class="service-error" id="service-error" hidden></div>
 
     <div class="workspace">
       <nav class="tab-rail" id="tab-rail" aria-label="Admin tabs"></nav>
