@@ -1,4 +1,6 @@
 .env
+__pycache__/
+*.pyc
 data/gc/state-store.json.stream
 data/gc/trusted_keys/*
 !data/gc/trusted_keys/
