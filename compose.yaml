@@ -48,7 +48,7 @@ services:
 
   ssl-vision-client:
     <<: *host_service
-    image: ghcr.io/ibis-ssl/ssl-vision-client:${SSL_VISION_CLIENT_TAG}
+    image: robocupssl/ssl-vision-client:${SSL_VISION_CLIENT_TAG}
     command:
       - -address
       - :${VISION_CLIENT_UI_PORT}
