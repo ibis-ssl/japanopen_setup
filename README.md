@@ -4,6 +4,9 @@ RoboCup Japan Open の SSL 運営 PC 向け Docker Compose 構成。試合制御
 
 > `ssl-vision` 本体とカメラ設定はこのリポジトリの対象外です。
 
+[Screencast from 2026-04-23 09-23-57.webm](https://github.com/user-attachments/assets/fb351697-1ee9-49c6-afd1-2a189de46a4e)
+
+
 ## 必要条件
 
 - Docker Engine + Docker Compose plugin
