@@ -123,6 +123,7 @@ async def ws_endpoint(ws: WebSocket) -> None:
             mtype = msg.get("type")
             if mtype == "resume":
                 _freeze["frozen"] = False
+                _freeze["armed"] = True
             elif mtype == "rearm":
                 _freeze["armed"] = True
                 _freeze["frozen"] = False

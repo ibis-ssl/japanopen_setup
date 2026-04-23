@@ -489,6 +489,7 @@ btnFreeze.addEventListener('click', () => {
 
 btnResume.addEventListener('click', () => {
   state.frozen = false;
+  state.armed = true;
   state.chartPanned = false;
   freezeBanner.hidden = true;
   setStatus('live');
