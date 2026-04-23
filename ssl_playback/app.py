@@ -33,21 +33,33 @@ _freeze: dict = {
     "trigger_event": None,
 }
 _connections: set[WebSocket] = set()
+_frozen_event_ids: set[str] = set()  # POSSIBLE_GOAL でフリーズ済みのイベント ID
 
 
 async def _on_event(event_dict: dict) -> None:
     kind = event_dict.get("kind", "")
-    if kind == "POSSIBLE_GOAL" and _freeze["armed"] and not _freeze["frozen"]:
-        assert _buf is not None
-        snapshot = await _buf.snapshot(_window_s)
-        geo = get_field_geometry()
-        if geo:
-            snapshot["geometry"] = geo
-        _freeze["frozen"] = True
-        _freeze["armed"] = False
-        _freeze["snapshot"] = snapshot
-        _freeze["trigger_event"] = event_dict
-        await _broadcast({"type": "frozen", "trigger_event": event_dict, "snapshot": snapshot})
+    if kind != "POSSIBLE_GOAL":
+        return
+    eid = event_dict.get("id", "")
+    # await より前にアトミックに確認・確保し、二重フリーズを防ぐ
+    if eid and eid in _frozen_event_ids:
+        return
+    if not (_freeze["armed"] and not _freeze["frozen"]):
+        logger.info("POSSIBLE_GOAL skipped: armed=%s frozen=%s id=%s",
+                    _freeze["armed"], _freeze["frozen"], eid)
+        return
+    if eid:
+        _frozen_event_ids.add(eid)
+    assert _buf is not None
+    snapshot = await _buf.snapshot(_window_s)
+    geo = get_field_geometry()
+    if geo:
+        snapshot["geometry"] = geo
+    _freeze["frozen"] = True
+    _freeze["armed"] = False
+    _freeze["snapshot"] = snapshot
+    _freeze["trigger_event"] = event_dict
+    await _broadcast({"type": "frozen", "trigger_event": event_dict, "snapshot": snapshot})
 
 
 async def _broadcast(msg: dict) -> None:

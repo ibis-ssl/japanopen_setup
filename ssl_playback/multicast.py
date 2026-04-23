@@ -184,10 +184,13 @@ class _RefereeProtocol(asyncio.DatagramProtocol):
                 eid = game_event.id or None
                 if eid and eid in _seen_event_ids:
                     continue
-                if eid:
-                    _seen_event_ids.add(eid)
                 if warmup:
-                    continue  # 初回パケットの既存イベントは登録のみ、callback しない
+                    # 初回パケットの既存イベント: 永続的に抑制して callback しない
+                    if eid:
+                        _seen_event_ids.add(eid)
+                    continue
+                # 非ウォームアップ: _seen_event_ids への追加は callback 完了後に行う
+                # (await 中断中に状態変化が起きても ID が永続抑制されないようにする)
                 try:
                     kind = GameEvent.Type.Name(game_event.type)
                 except ValueError:
@@ -196,8 +199,10 @@ class _RefereeProtocol(asyncio.DatagramProtocol):
                 t_mono = time.monotonic()
                 sample = EventSample(t=t_mono, kind=kind, origin=origin)
                 await self._buf.add_event(sample)
-                event_dict = {"kind": kind, "origin": origin, "dt": 0.0}
+                event_dict = {"kind": kind, "origin": origin, "dt": 0.0, "id": eid or ""}
                 await self._on_event(event_dict)
+                if eid:
+                    _seen_event_ids.add(eid)
         except Exception as exc:
             logger.warning("referee parse error: %s", exc)
 
