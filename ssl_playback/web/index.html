@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SSL Playback</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uplot@1.6.31/dist/uPlot.min.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <span class="topbar__title">SSL Playback</span>
+      <span class="topbar__sep">|</span>
+      <div class="window-control">
+        <label for="window-range">窓</label>
+        <input type="range" id="window-range" min="5" max="60" value="5" step="1">
+        <span id="window-label">5s</span>
+      </div>
+      <div class="topbar__spacer"></div>
+      <button class="btn btn-outline" id="btn-freeze">■ Freeze</button>
+      <button class="btn btn-outline" id="btn-resume" disabled>▶ Resume</button>
+      <button class="btn btn-primary" id="btn-rearm" disabled>Re-arm</button>
+      <span class="status-chip" data-state="disconnected" id="status-chip">Disconnected</span>
+    </header>
+
+    <div class="freeze-banner" id="freeze-banner" hidden></div>
+
+    <div class="workspace">
+      <section class="field-panel" id="field-panel">
+        <canvas class="field-canvas" id="field-canvas"></canvas>
+      </section>
+
+      <section class="chart-panel">
+        <div class="chart-panel__label">ボール速度 (m/s)</div>
+        <div id="uplot-container"></div>
+      </section>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/uplot@1.6.31/dist/uPlot.iife.min.js"></script>
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>

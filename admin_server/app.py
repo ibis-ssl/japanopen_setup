@@ -107,6 +107,15 @@ SERVICE_DEFS = [
         summary="公式ログ記録",
     ),
     ServiceDef(
+        service="ssl-playback",
+        label="Playback",
+        category="web",
+        tab_id="playback",
+        embeddable=True,
+        port_env="PLAYBACK_UI_PORT",
+        summary="POSSIBLE_GOAL 判定用プレイバック",
+    ),
+    ServiceDef(
         service="audioref",
         label="AudioRef",
         category="background",
@@ -121,6 +130,7 @@ TAB_DEFS = [
     {"id": "status-board", "label": "Status Board"},
     {"id": "remote-yellow", "label": "Remote Yellow"},
     {"id": "remote-blue", "label": "Remote Blue"},
+    {"id": "playback", "label": "Playback"},
     {"id": "settings", "label": "Settings"},
 ]
 

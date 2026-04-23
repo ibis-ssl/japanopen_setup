@@ -132,7 +132,7 @@ function createEmbedPanel(tab) {
   const running = isServiceRunning(service);
   panel.innerHTML = `
     <div class="embed-shell" data-role="embed-shell" data-running="${String(running)}">
-      <iframe title="${service.label}" src="${service.url}" loading="lazy"></iframe>
+      <iframe title="${service.label}" src="${service.url ?? ''}" loading="lazy"></iframe>
       <div class="embed-state" data-role="embed-state"${running ? ' hidden' : ''}>
         <strong data-role="state-title"></strong>
         <p data-role="state-copy"></p>

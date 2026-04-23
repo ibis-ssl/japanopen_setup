@@ -39,11 +39,22 @@ RoboCup Japan Open の SSL 運営 PC 向け Docker Compose 構成。試合制御
 | `ssl-status-board` | 状態表示 | <http://localhost:8083> |
 | `ssl-remote-control-yellow` | Yellow リモコン | <http://localhost:8084> |
 | `ssl-remote-control-blue` | Blue リモコン | <http://localhost:8085> |
+| `ssl-playback` | POSSIBLE_GOAL 判定用プレイバック | <http://localhost:8086> |
 | `admin-ui` | 管理画面 | <http://127.0.0.1:8080> |
 | `autoref-tigers` | TIGERs AutoRef | — |
 | `autoref-erforce` | ER-Force AutoRef | — |
 | `ssl-auto-recorder` | 公式ログ自動記録 | `data/logs/auto-recorder/` |
 | `audioref` | 音声案内 | `/dev/snd` 使用 |
+
+## Playback
+
+`ssl-playback` は POSSIBLE_GOAL 発生時にボール速度（6.5 m/s 上限）を確認するためのリアルタイムプレイバックサービスです。Vision/Tracker の multicast を購読し、速度グラフと軌跡を管理画面の **Playback** タブに表示します。
+
+- **自動フリーズ**: POSSIBLE_GOAL 検知時に直前の時間窓（デフォルト 15 秒、最大 60 秒）を自動で静止表示
+- **速度グラフ**: Tracker の速度 + Vision 生検出からの微分、6.5 m/s 基準線、全 GameEvent の縦線注釈
+- **Re-arm**: Resume 後に Re-arm ボタンで次の POSSIBLE_GOAL でも自動フリーズを有効化
+
+プロトコルの `.proto` ファイルは `ssl-game-controller` リポジトリ（タグ `SSL_GC_PROTO_REF`）から Docker build 時に取得します。
 
 ## AudioRef
 
@@ -63,6 +74,7 @@ data/                 GC state・公式ログ（Git 管理外）
 scripts/ops.sh        運用ラッパ
 admin_server/         管理画面バックエンド（FastAPI、uvicorn --reload）
 admin_web/            管理画面フロントエンド（静的配信）
+ssl_playback/         Playback サービス（FastAPI + WS + 静的配信）
 docker/               ローカルビルド用 Dockerfile
 ```
 

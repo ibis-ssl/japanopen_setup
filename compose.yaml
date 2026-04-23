@@ -48,16 +48,12 @@ services:
 
   ssl-vision-client:
     <<: *host_service
-    image: robocupssl/ssl-vision-client:${SSL_VISION_CLIENT_TAG}
+    image: ghcr.io/ibis-ssl/ssl-vision-client:${SSL_VISION_CLIENT_TAG}
     command:
       - -address
       - :${VISION_CLIENT_UI_PORT}
-      - -visionAddress
-      - ${VISION_ADDRESS}:${VISION_PORT}
-      - -trackedAddress
-      - ${TRACKER_ADDRESS}:${TRACKER_PORT}
-      - -refereeAddress
-      - ${REFEREE_ADDRESS}:${REFEREE_PORT}
+    volumes:
+      - ./config/ssl-vision-client.json:/config.json:ro
 
   ssl-status-board:
     <<: *host_service
@@ -133,6 +129,25 @@ services:
       - -http-serve=false
     volumes:
       - ./data/logs/auto-recorder:/logs:rw
+
+  ssl-playback:
+    <<: *host_service
+    build:
+      context: .
+      dockerfile: docker/ssl-playback/Dockerfile
+      args:
+        SSL_GC_PROTO_REF: ${SSL_GC_PROTO_REF:-v3.20.3}
+    environment:
+      VISION_ADDRESS: ${VISION_ADDRESS}
+      VISION_PORT: ${VISION_PORT}
+      TRACKER_ADDRESS: ${TRACKER_ADDRESS}
+      TRACKER_PORT: ${TRACKER_PORT}
+      REFEREE_ADDRESS: ${REFEREE_ADDRESS}
+      REFEREE_PORT: ${REFEREE_PORT}
+      PLAYBACK_UI_PORT: ${PLAYBACK_UI_PORT}
+      PLAYBACK_BUFFER_SECONDS: "60"
+    volumes:
+      - ./ssl_playback:/app/ssl_playback:ro
 
   audioref:
     <<: *host_service
