@@ -3,8 +3,12 @@ const state = {
   services: [],
   settings: null,
   outputs: [],
+  visionQuality: null,
+  visionQualityError: '',
   activeTab: 'game-controller',
 };
+
+let visionQualityTimer = null;
 
 const tabRail = document.getElementById('tab-rail');
 const panelStack = document.getElementById('panel-stack');
@@ -46,6 +50,20 @@ function updateTopbar() {
     `;
     return;
   }
+  if (tabId === 'vision-quality') {
+    const playback = playbackService();
+    const directLink = playback?.url
+      ? `<a class="ghost-link" href="${playback.url}" target="_blank" rel="noreferrer">Open Playback</a>`
+      : '';
+    topbarTitle.textContent = 'Vision QC';
+    topbarActions.innerHTML = `
+      <span class="status-pill" data-state="${playback?.state ?? 'unknown'}">
+        ${playback ? `Playback: ${formatState(playback.state)}` : 'Playback: Unknown'}
+      </span>
+      ${directLink}
+    `;
+    return;
+  }
   const service = serviceByTab(tabId);
   if (!service) {
     topbarTitle.textContent = '';
@@ -74,15 +92,23 @@ function setActiveTab(tabId) {
     panel.classList.toggle('is-active', panel.dataset.panelId === safeTabId);
   }
   updateTopbar();
+  updateVisionQualityPolling();
 }
 
 function serviceByTab(tabId) {
   return state.services.find((service) => service.tabId === tabId) ?? null;
 }
 
+function playbackService() {
+  return state.services.find((service) => service.id === 'ssl-playback') ?? null;
+}
+
 function serviceLabelForTab(tabId) {
   if (tabId === 'settings') {
     return state.services.find((service) => service.id === 'audioref')?.state ?? '';
+  }
+  if (tabId === 'vision-quality') {
+    return playbackService()?.state ?? '';
   }
   return serviceByTab(tabId)?.state ?? '';
 }
@@ -169,6 +195,58 @@ function createSettingsPanel() {
   return panel;
 }
 
+function createVisionQualityPanel() {
+  const panel = document.createElement('section');
+  panel.className = 'panel';
+  panel.dataset.panelId = 'vision-quality';
+  panel.innerHTML = `
+    <div class="panel__body vision-qc">
+      <section class="qc-summary-grid" aria-label="Vision packet quality summary">
+        <div class="qc-metric">
+          <span>Max timestamp skew</span>
+          <strong data-qc-summary="skew">-</strong>
+        </div>
+        <div class="qc-metric">
+          <span>Active sources</span>
+          <strong data-qc-summary="sources">0</strong>
+        </div>
+        <div class="qc-metric">
+          <span>Active streams</span>
+          <strong data-qc-summary="streams">0</strong>
+        </div>
+        <div class="qc-metric">
+          <span>Packets</span>
+          <strong data-qc-summary="packets">0</strong>
+        </div>
+      </section>
+
+      <section class="qc-table-shell">
+        <table class="qc-table">
+          <thead>
+            <tr>
+              <th scope="col">Status</th>
+              <th scope="col">Source IP</th>
+              <th scope="col">Camera</th>
+              <th scope="col">Frame</th>
+              <th scope="col">t_capture</th>
+              <th scope="col">t_sent</th>
+              <th scope="col">Send period</th>
+              <th scope="col">Rx period</th>
+              <th scope="col">Age</th>
+              <th scope="col">Packets</th>
+            </tr>
+          </thead>
+          <tbody id="vision-quality-rows"></tbody>
+        </table>
+        <div class="qc-empty" id="vision-quality-empty">No Vision packets received.</div>
+      </section>
+
+      <div class="flash" id="vision-quality-flash" hidden></div>
+    </div>
+  `;
+  return panel;
+}
+
 function renderPanels() {
   if (panelStack.children.length) {
     return;
@@ -177,6 +255,10 @@ function renderPanels() {
   for (const tab of getVisibleTabs()) {
     if (tab.id === 'settings') {
       panelStack.appendChild(createSettingsPanel());
+      continue;
+    }
+    if (tab.id === 'vision-quality') {
+      panelStack.appendChild(createVisionQualityPanel());
       continue;
     }
     panelStack.appendChild(createEmbedPanel(tab));
@@ -243,6 +325,98 @@ function renderSettings() {
   reloadButton.disabled = false;
 }
 
+function formatNumber(value, digits = 0) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return '-';
+  }
+  return numeric.toFixed(digits);
+}
+
+function formatMs(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return '-';
+  }
+  if (numeric >= 1000) {
+    return `${(numeric / 1000).toFixed(2)} s`;
+  }
+  if (numeric >= 100) {
+    return `${numeric.toFixed(0)} ms`;
+  }
+  if (numeric >= 10) {
+    return `${numeric.toFixed(1)} ms`;
+  }
+  return `${numeric.toFixed(2)} ms`;
+}
+
+function formatTimestamp(value) {
+  return formatNumber(value, 6);
+}
+
+function addCell(row, text, className = '') {
+  const cell = document.createElement('td');
+  if (className) {
+    cell.className = className;
+  }
+  cell.textContent = text;
+  row.appendChild(cell);
+}
+
+function renderVisionQuality() {
+  const panel = panelStack.querySelector('[data-panel-id="vision-quality"]');
+  if (!panel) {
+    return;
+  }
+
+  const summary = state.visionQuality?.summary ?? {};
+  panel.querySelector('[data-qc-summary="skew"]').textContent = formatMs(summary.maxCaptureSkewMs);
+  panel.querySelector('[data-qc-summary="sources"]').textContent = formatNumber(summary.activeSources);
+  panel.querySelector('[data-qc-summary="streams"]').textContent =
+    `${formatNumber(summary.activeStreams)} / ${formatNumber(summary.totalStreams)}`;
+  panel.querySelector('[data-qc-summary="packets"]').textContent = formatNumber(summary.receivedPackets);
+
+  const flash = panel.querySelector('#vision-quality-flash');
+  if (state.visionQualityError) {
+    flash.hidden = false;
+    flash.dataset.tone = 'error';
+    flash.textContent = state.visionQualityError;
+  } else {
+    flash.hidden = true;
+    flash.textContent = '';
+  }
+
+  const body = panel.querySelector('#vision-quality-rows');
+  const empty = panel.querySelector('#vision-quality-empty');
+  body.innerHTML = '';
+  const rows = state.visionQuality?.rows ?? [];
+  empty.hidden = rows.length > 0 || Boolean(state.visionQualityError);
+
+  for (const item of rows) {
+    const row = document.createElement('tr');
+    row.dataset.active = String(Boolean(item.active));
+
+    const statusCell = document.createElement('td');
+    const badge = document.createElement('span');
+    badge.className = 'qc-badge';
+    badge.dataset.active = String(Boolean(item.active));
+    badge.textContent = item.active ? 'Active' : 'Stale';
+    statusCell.appendChild(badge);
+    row.appendChild(statusCell);
+
+    addCell(row, item.sourceIp ?? '-', 'mono-cell');
+    addCell(row, formatNumber(item.cameraId));
+    addCell(row, formatNumber(item.frameNumber));
+    addCell(row, formatTimestamp(item.captureTimestamp), 'mono-cell');
+    addCell(row, formatTimestamp(item.sentTimestamp), 'mono-cell');
+    addCell(row, formatMs(item.sentPeriodMs), 'numeric-cell');
+    addCell(row, formatMs(item.receivePeriodMs), 'numeric-cell');
+    addCell(row, formatMs(item.ageMs), 'numeric-cell');
+    addCell(row, formatNumber(item.packetCount), 'numeric-cell');
+    body.appendChild(row);
+  }
+}
+
 function renderSummary() {
   const runningCount = state.services.filter((service) => service.state === 'running').length;
   metricRunning.textContent = String(runningCount);
@@ -279,6 +453,31 @@ async function fetchJson(url, options) {
   return response.json();
 }
 
+async function refreshVisionQuality() {
+  try {
+    state.visionQuality = await fetchJson('/api/vision-quality');
+    state.visionQualityError = '';
+  } catch (error) {
+    state.visionQuality = null;
+    state.visionQualityError = error.message;
+  }
+  renderVisionQuality();
+}
+
+function updateVisionQualityPolling() {
+  if (visionQualityTimer !== null) {
+    window.clearInterval(visionQualityTimer);
+    visionQualityTimer = null;
+  }
+  if (state.activeTab !== 'vision-quality') {
+    return;
+  }
+  refreshVisionQuality();
+  visionQualityTimer = window.setInterval(() => {
+    refreshVisionQuality();
+  }, 1000);
+}
+
 async function refreshAll({ flash = false } = {}) {
   const [servicesPayload, settingsPayload, outputsPayload] = await Promise.all([
     fetchJson('/api/services'),
@@ -296,6 +495,7 @@ async function refreshAll({ flash = false } = {}) {
   updateEmbedPanels();
   updateTopbar();
   renderSettings();
+  renderVisionQuality();
   renderSummary();
   renderError(servicesPayload.summary);
 

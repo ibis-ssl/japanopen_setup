@@ -10,6 +10,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from .buffer import EventSample, RingBuffer, TrackerSample, VisionSpeedSample
+from .vision_quality import VisionQualityMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -116,17 +117,18 @@ class _TrackerProtocol(asyncio.DatagramProtocol):
 
 
 class _VisionProtocol(asyncio.DatagramProtocol):
-    def __init__(self, buf: RingBuffer) -> None:
+    def __init__(self, buf: RingBuffer, quality: VisionQualityMonitor | None) -> None:
         self._buf = buf
+        self._quality = quality
         self._count = 0
 
     def datagram_received(self, data: bytes, addr: Any) -> None:
         self._count += 1
         if self._count % 100 == 1:
             logger.info("vision: received %d datagrams (last from %s, len=%d)", self._count, addr, len(data))
-        asyncio.create_task(self._process(data))
+        asyncio.create_task(self._process(data, addr))
 
-    async def _process(self, data: bytes) -> None:
+    async def _process(self, data: bytes, addr: Any) -> None:
         try:
             from vision.ssl_vision_wrapper_pb2 import SSL_WrapperPacket
 
@@ -137,6 +139,18 @@ class _VisionProtocol(asyncio.DatagramProtocol):
             if not pkt.HasField("detection"):
                 return
             det = pkt.detection
+            t_now = time.monotonic()
+            if self._quality is not None:
+                source_ip = addr[0] if isinstance(addr, tuple) and addr else str(addr)
+                frame_number = getattr(det, "frame_number", None)
+                await self._quality.record(
+                    source_ip=source_ip,
+                    camera_id=int(det.camera_id),
+                    frame_number=int(frame_number) if frame_number is not None else None,
+                    capture_timestamp=det.t_capture,
+                    sent_timestamp=getattr(det, "t_sent", None),
+                    received_at=t_now,
+                )
             if not det.balls:
                 return
             best = max(det.balls, key=lambda b: b.confidence)
@@ -144,7 +158,6 @@ class _VisionProtocol(asyncio.DatagramProtocol):
             t_cap = det.t_capture
             x_m = best.x / 1000.0
             y_m = best.y / 1000.0
-            t_now = time.monotonic()
             prev = _vision_last.get(cam)
             if prev is not None:
                 t_prev, x_prev, y_prev = prev
@@ -217,12 +230,13 @@ async def start_receivers(
     tracker_port: int,
     referee_group: str,
     referee_port: int,
+    vision_quality: VisionQualityMonitor | None = None,
 ) -> list[asyncio.BaseTransport]:
     loop = asyncio.get_running_loop()
     transports: list[asyncio.BaseTransport] = []
 
     for group, port, factory in [
-        (vision_group, vision_port, lambda: _VisionProtocol(buf)),
+        (vision_group, vision_port, lambda: _VisionProtocol(buf, vision_quality)),
         (tracker_group, tracker_port, lambda: _TrackerProtocol(buf)),
         (referee_group, referee_port, lambda: _RefereeProtocol(buf, on_event)),
     ]:

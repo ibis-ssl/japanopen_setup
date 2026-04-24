@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .buffer import RingBuffer
 from .multicast import get_field_geometry, start_receivers
+from .vision_quality import VisionQualityMonitor
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,6 +26,7 @@ BUFFER_SECONDS = float(os.environ.get("PLAYBACK_BUFFER_SECONDS", "60"))
 PUSH_INTERVAL = 0.2
 
 _buf: RingBuffer | None = None
+_vision_quality: VisionQualityMonitor | None = None
 _window_s: float = 5.0
 _freeze: dict = {
     "armed": True,
@@ -88,8 +90,9 @@ async def _push_loop() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _buf
+    global _buf, _vision_quality
     _buf = RingBuffer(BUFFER_SECONDS)
+    _vision_quality = VisionQualityMonitor()
     transports = await start_receivers(
         _buf,
         _on_event,
@@ -99,6 +102,7 @@ async def lifespan(app: FastAPI):
         tracker_port=int(os.environ.get("TRACKER_PORT", "10010")),
         referee_group=os.environ.get("REFEREE_ADDRESS", "224.5.23.1"),
         referee_port=int(os.environ.get("REFEREE_PORT", "10003")),
+        vision_quality=_vision_quality,
     )
     push_task = asyncio.create_task(_push_loop())
     yield
@@ -119,6 +123,23 @@ async def root() -> FileResponse:
 @app.get("/healthz")
 async def healthz() -> dict:
     return {"ok": True}
+
+
+@app.get("/api/vision-quality")
+async def vision_quality() -> dict:
+    if _vision_quality is None:
+        return {
+            "summary": {
+                "maxCaptureSkewMs": None,
+                "activeSources": 0,
+                "activeStreams": 0,
+                "totalStreams": 0,
+                "receivedPackets": 0,
+                "activeAfterSeconds": 2.0,
+            },
+            "rows": [],
+        }
+    return await _vision_quality.snapshot()
 
 
 @app.websocket("/ws")

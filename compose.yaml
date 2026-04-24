@@ -85,18 +85,18 @@ services:
       - -team
       - BLUE
 
-  autoref-tigers:
-    <<: *host_service
-    image: tigersmannheim/auto-referee:1.7.1-12-g39cac863
-    command:
-      - -a
-      - -hl
-      - --visionAddress
-      - 224.5.23.2:10006
-      - --refereeAddress
-      - 224.5.23.1:10003
-      - --trackerAddress
-      - 224.5.23.2:10010
+  # autoref-tigers:
+  #   <<: *host_service
+  #   image: tigersmannheim/auto-referee:1.7.1-12-g39cac863
+  #   command:
+  #     - -a
+  #     - -hl
+  #     - --visionAddress
+  #     - 224.5.23.2:10006
+  #     - --refereeAddress
+  #     - 224.5.23.1:10003
+  #     - --trackerAddress
+  #     - 224.5.23.2:10010
 
   autoref-erforce:
     <<: *host_service

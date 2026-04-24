@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import re
 import subprocess
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -16,6 +19,7 @@ ROOT_DIR = Path(os.environ.get("WORKSPACE_DIR", Path(__file__).resolve().parents
 WEB_DIR = ROOT_DIR / "admin_web"
 OPS_SCRIPT = ROOT_DIR / "scripts" / "ops.sh"
 HOST_PROC_ASOUND = Path(os.environ.get("HOST_PROC_ASOUND", "/host/proc/asound"))
+_PLAYBACK_VISION_QUALITY_URL: str | None = None
 
 
 @dataclass(frozen=True)
@@ -83,12 +87,12 @@ SERVICE_DEFS = [
         port_env="REMOTE_CONTROL_BLUE_UI_PORT",
         summary="Blue 側 remote control",
     ),
-    ServiceDef(
-        service="autoref-tigers",
-        label="TIGERs AutoRef",
-        category="background",
-        summary="TIGERs Mannheim auto referee",
-    ),
+    # ServiceDef(
+    #     service="autoref-tigers",
+    #     label="TIGERs AutoRef",
+    #     category="background",
+    #     summary="TIGERs Mannheim auto referee",
+    # ),
     ServiceDef(
         service="autoref-erforce",
         label="ER-Force AutoRef",
@@ -122,6 +126,7 @@ TAB_DEFS = [
     {"id": "overview", "label": "Overview"},
     {"id": "game-controller", "label": "Game Controller"},
     {"id": "vision-client", "label": "Vision Client"},
+    {"id": "vision-quality", "label": "Vision QC"},
     {"id": "status-board", "label": "Status Board"},
     {"id": "remote-yellow", "label": "Remote Yellow"},
     {"id": "remote-blue", "label": "Remote Blue"},
@@ -398,6 +403,53 @@ def current_settings_payload() -> dict[str, Any]:
     }
 
 
+def playback_vision_quality_url() -> str:
+    global _PLAYBACK_VISION_QUALITY_URL
+    if _PLAYBACK_VISION_QUALITY_URL:
+        return _PLAYBACK_VISION_QUALITY_URL
+
+    compose_services = load_compose_services()
+    playback = next(service for service in SERVICE_DEFS if service.service == "ssl-playback")
+    base_url = service_url(playback, compose_services)
+    if not base_url:
+        raise HTTPException(status_code=503, detail="ssl-playback URL is not configured")
+
+    _PLAYBACK_VISION_QUALITY_URL = f"{base_url.rstrip('/')}/api/vision-quality"
+    return _PLAYBACK_VISION_QUALITY_URL
+
+
+def playback_vision_quality_payload() -> dict[str, Any]:
+    url = playback_vision_quality_url()
+    request = urllib.request.Request(url, headers={"Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=2) as response:
+            payload = response.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"ssl-playback vision quality API returned HTTP {exc.code}",
+        ) from exc
+    except (TimeoutError, urllib.error.URLError) as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=f"ssl-playback vision quality API is unavailable: {exc}",
+        ) from exc
+
+    try:
+        parsed = json.loads(payload)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="ssl-playback vision quality API returned invalid JSON",
+        ) from exc
+    if not isinstance(parsed, dict):
+        raise HTTPException(
+            status_code=502,
+            detail="ssl-playback vision quality API returned unexpected JSON",
+        )
+    return parsed
+
+
 @app.get("/")
 async def root() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")
@@ -421,3 +473,8 @@ async def get_settings() -> dict[str, Any]:
 @app.get("/api/audioref/outputs")
 async def get_audioref_outputs() -> dict[str, Any]:
     return {"outputs": parse_playback_outputs()}
+
+
+@app.get("/api/vision-quality")
+async def get_vision_quality() -> dict[str, Any]:
+    return await asyncio.to_thread(playback_vision_quality_payload)
