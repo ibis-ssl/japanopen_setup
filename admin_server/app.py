@@ -15,6 +15,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from admin_server.logs import (
+    compose_logs_command,
+    normalize_log_service,
+    normalize_log_tail,
+    utc_timestamp,
+)
+
 ROOT_DIR = Path(os.environ.get("WORKSPACE_DIR", Path(__file__).resolve().parents[1]))
 WEB_DIR = ROOT_DIR / "admin_web"
 OPS_SCRIPT = ROOT_DIR / "scripts" / "ops.sh"
@@ -124,6 +131,7 @@ SERVICE_DEFS = [
 
 TAB_DEFS = [
     {"id": "overview", "label": "Overview"},
+    {"id": "logs", "label": "Logs"},
     {"id": "game-controller", "label": "Game Controller"},
     {"id": "vision-client", "label": "Vision Client"},
     {"id": "vision-quality", "label": "Vision QC"},
@@ -450,6 +458,39 @@ def playback_vision_quality_payload() -> dict[str, Any]:
     return parsed
 
 
+def run_compose_logs(service: str | None, tail: int) -> subprocess.CompletedProcess[str]:
+    command = compose_logs_command(ROOT_DIR, service, tail)
+    try:
+        result = subprocess.run(
+            command,
+            cwd=ROOT_DIR,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(
+            status_code=504,
+            detail=f"compose logs command timed out: {' '.join(exc.cmd)}",
+        ) from exc
+
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "compose logs command failed"
+        raise HTTPException(status_code=500, detail=detail)
+    return result
+
+
+def compose_logs_payload(service: str | None, tail: int) -> dict[str, Any]:
+    result = run_compose_logs(service, tail)
+    return {
+        "service": service or "all",
+        "tail": tail,
+        "logs": result.stdout,
+        "generatedAt": utc_timestamp(),
+    }
+
+
 @app.get("/")
 async def root() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")
@@ -478,3 +519,15 @@ async def get_audioref_outputs() -> dict[str, Any]:
 @app.get("/api/vision-quality")
 async def get_vision_quality() -> dict[str, Any]:
     return await asyncio.to_thread(playback_vision_quality_payload)
+
+
+@app.get("/api/logs")
+async def get_logs(service: str = "all", tail: str | None = None) -> dict[str, Any]:
+    allowed_services = {service_def.service for service_def in SERVICE_DEFS}
+    try:
+        normalized_service = normalize_log_service(service, allowed_services)
+        normalized_tail = normalize_log_tail(tail)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return await asyncio.to_thread(compose_logs_payload, normalized_service, normalized_tail)

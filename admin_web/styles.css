@@ -702,6 +702,104 @@ code {
   display: none;
 }
 
+/* ── Logs ── */
+.logs-panel {
+  gap: 12px;
+}
+
+.logs-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(132px, 160px) auto auto auto;
+  gap: 12px;
+  align-items: end;
+  flex-shrink: 0;
+  padding: 16px;
+  border-radius: var(--md-sys-shape-corner-sm);
+  background: var(--md-sys-color-surface-container-lowest);
+}
+
+.logs-field {
+  min-width: 0;
+}
+
+.logs-select {
+  height: 48px;
+  padding-top: 12px;
+}
+
+.logs-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-sm);
+  background: var(--md-sys-color-surface-container-low);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.logs-toggle input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--md-sys-color-primary);
+}
+
+.logs-meta {
+  min-height: 20px;
+  flex-shrink: 0;
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.logs-output-shell {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-corner-sm);
+  background: #111318;
+}
+
+.logs-output {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: auto;
+  padding: 14px;
+  color: #E9EEF6;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.logs-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  color: #BFC7D5;
+  font-size: 14px;
+  line-height: 20px;
+  text-align: center;
+}
+
+.logs-empty[hidden] {
+  display: none;
+}
+
 /* ── Responsive ── */
 @media (max-width: 960px) {
   .workspace {
@@ -725,6 +823,10 @@ code {
     white-space: nowrap;
     flex-shrink: 0;
   }
+
+  .logs-toolbar {
+    grid-template-columns: minmax(220px, 1fr) minmax(132px, 160px);
+  }
 }
 
 @media (max-width: 600px) {
@@ -739,5 +841,14 @@ code {
   .topbar__app,
   .topbar__sep {
     display: none;
+  }
+
+  .logs-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .logs-toolbar .ghost-button,
+  .logs-toggle {
+    width: 100%;
   }
 }

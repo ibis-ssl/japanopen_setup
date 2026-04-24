@@ -5,10 +5,18 @@ const state = {
   outputs: [],
   visionQuality: null,
   visionQualityError: '',
+  logService: 'all',
+  logTail: 200,
+  logsAutoRefresh: true,
+  logsContent: '',
+  logsError: '',
+  logsGeneratedAt: '',
+  logsLoading: false,
   activeTab: 'game-controller',
 };
 
 let visionQualityTimer = null;
+let logsTimer = null;
 
 const tabRail = document.getElementById('tab-rail');
 const panelStack = document.getElementById('panel-stack');
@@ -40,6 +48,11 @@ function getTabFromHash() {
 
 function updateTopbar() {
   const tabId = state.activeTab;
+  if (tabId === 'logs') {
+    topbarTitle.textContent = 'Logs';
+    topbarActions.innerHTML = '<span class="status-pill">Docker Compose</span>';
+    return;
+  }
   if (tabId === 'settings') {
     const audioref = state.services.find((s) => s.id === 'audioref');
     topbarTitle.textContent = 'Settings';
@@ -93,6 +106,7 @@ function setActiveTab(tabId) {
   }
   updateTopbar();
   updateVisionQualityPolling();
+  updateLogsPolling();
 }
 
 function serviceByTab(tabId) {
@@ -104,6 +118,9 @@ function playbackService() {
 }
 
 function serviceLabelForTab(tabId) {
+  if (tabId === 'logs') {
+    return '';
+  }
   if (tabId === 'settings') {
     return state.services.find((service) => service.id === 'audioref')?.state ?? '';
   }
@@ -247,12 +264,72 @@ function createVisionQualityPanel() {
   return panel;
 }
 
+function createLogsPanel() {
+  const panel = document.createElement('section');
+  panel.className = 'panel';
+  panel.dataset.panelId = 'logs';
+  panel.innerHTML = `
+    <div class="panel__body logs-panel">
+      <section class="logs-toolbar" aria-label="Log controls">
+        <div class="logs-field">
+          <label class="field-label" for="logs-service">Service</label>
+          <select class="select-input logs-select" id="logs-service"></select>
+        </div>
+        <div class="logs-field logs-field--compact">
+          <label class="field-label" for="logs-tail">Tail</label>
+          <select class="select-input logs-select" id="logs-tail">
+            <option value="50">50 lines</option>
+            <option value="100">100 lines</option>
+            <option value="200">200 lines</option>
+            <option value="500">500 lines</option>
+            <option value="1000">1000 lines</option>
+          </select>
+        </div>
+        <label class="logs-toggle">
+          <input type="checkbox" id="logs-auto-refresh" checked>
+          <span>Auto-refresh</span>
+        </label>
+        <button class="ghost-button" type="button" id="logs-refresh">Refresh</button>
+        <button class="ghost-button" type="button" id="logs-copy">Copy</button>
+      </section>
+
+      <div class="logs-meta" id="logs-meta"></div>
+      <div class="logs-output-shell">
+        <pre class="logs-output" id="logs-output" aria-live="polite"></pre>
+        <div class="logs-empty" id="logs-empty" hidden>No logs returned.</div>
+      </div>
+      <div class="flash" id="logs-flash" hidden></div>
+    </div>
+  `;
+
+  panel.querySelector('#logs-service').addEventListener('change', (event) => {
+    state.logService = event.target.value;
+    refreshLogs();
+  });
+  panel.querySelector('#logs-tail').addEventListener('change', (event) => {
+    state.logTail = Number(event.target.value);
+    refreshLogs();
+  });
+  panel.querySelector('#logs-auto-refresh').addEventListener('change', (event) => {
+    state.logsAutoRefresh = event.target.checked;
+    updateLogsPolling();
+  });
+  panel.querySelector('#logs-refresh').addEventListener('click', () => refreshLogs());
+  panel.querySelector('#logs-copy').addEventListener('click', () => copyLogs());
+
+  return panel;
+}
+
 function renderPanels() {
   if (panelStack.children.length) {
     return;
   }
 
   for (const tab of getVisibleTabs()) {
+    if (tab.id === 'logs') {
+      panelStack.appendChild(createLogsPanel());
+      continue;
+    }
     if (tab.id === 'settings') {
       panelStack.appendChild(createSettingsPanel());
       continue;
@@ -417,6 +494,68 @@ function renderVisionQuality() {
   }
 }
 
+function renderLogsPanel() {
+  const panel = panelStack.querySelector('[data-panel-id="logs"]');
+  if (!panel) {
+    return;
+  }
+
+  const serviceSelect = panel.querySelector('#logs-service');
+  const tailSelect = panel.querySelector('#logs-tail');
+  const autoRefresh = panel.querySelector('#logs-auto-refresh');
+  const refreshButton = panel.querySelector('#logs-refresh');
+  const copyButton = panel.querySelector('#logs-copy');
+  const meta = panel.querySelector('#logs-meta');
+  const output = panel.querySelector('#logs-output');
+  const empty = panel.querySelector('#logs-empty');
+  const flash = panel.querySelector('#logs-flash');
+
+  const currentService = state.logService;
+  serviceSelect.innerHTML = '';
+  const allOption = document.createElement('option');
+  allOption.value = 'all';
+  allOption.textContent = 'All services';
+  serviceSelect.appendChild(allOption);
+  for (const service of state.services) {
+    const option = document.createElement('option');
+    option.value = service.id;
+    option.textContent = `${service.label} (${service.id})`;
+    serviceSelect.appendChild(option);
+  }
+  const serviceValues = new Set(Array.from(serviceSelect.options).map((option) => option.value));
+  state.logService = serviceValues.has(currentService) ? currentService : 'all';
+  serviceSelect.value = state.logService;
+
+  tailSelect.value = String(state.logTail);
+  autoRefresh.checked = state.logsAutoRefresh;
+  refreshButton.disabled = state.logsLoading;
+  copyButton.disabled = !state.logsContent;
+
+  output.textContent = state.logsContent;
+  empty.hidden = Boolean(state.logsContent || state.logsError || state.logsLoading);
+
+  if (state.logsLoading) {
+    meta.textContent = 'Loading logs...';
+  } else if (state.logsGeneratedAt) {
+    const generatedAt = new Date(state.logsGeneratedAt);
+    const generatedLabel = Number.isNaN(generatedAt.getTime())
+      ? state.logsGeneratedAt
+      : generatedAt.toLocaleString();
+    meta.textContent = `Showing ${state.logTail} lines for ${state.logService} - updated ${generatedLabel}`;
+  } else {
+    meta.textContent = `Showing ${state.logTail} lines for ${state.logService}`;
+  }
+
+  if (state.logsError) {
+    flash.hidden = false;
+    flash.dataset.tone = 'error';
+    flash.textContent = state.logsError;
+  } else {
+    flash.hidden = true;
+    flash.textContent = '';
+  }
+}
+
 function renderSummary() {
   const runningCount = state.services.filter((service) => service.state === 'running').length;
   metricRunning.textContent = String(runningCount);
@@ -464,6 +603,54 @@ async function refreshVisionQuality() {
   renderVisionQuality();
 }
 
+async function refreshLogs() {
+  if (state.logsLoading) {
+    return;
+  }
+
+  state.logsLoading = true;
+  renderLogsPanel();
+  const params = new URLSearchParams({
+    service: state.logService,
+    tail: String(state.logTail),
+  });
+
+  try {
+    const payload = await fetchJson(`/api/logs?${params.toString()}`);
+    state.logsContent = payload.logs ?? '';
+    state.logsGeneratedAt = payload.generatedAt ?? '';
+    state.logsError = '';
+  } catch (error) {
+    state.logsContent = '';
+    state.logsGeneratedAt = '';
+    state.logsError = error.message;
+  } finally {
+    state.logsLoading = false;
+    renderLogsPanel();
+  }
+}
+
+async function copyLogs() {
+  if (!state.logsContent) {
+    return;
+  }
+  const flash = document.getElementById('logs-flash');
+  try {
+    await navigator.clipboard.writeText(state.logsContent);
+    if (flash) {
+      flash.hidden = false;
+      flash.dataset.tone = 'success';
+      flash.textContent = 'Logs copied.';
+    }
+  } catch (error) {
+    if (flash) {
+      flash.hidden = false;
+      flash.dataset.tone = 'error';
+      flash.textContent = `Copy failed: ${error.message}`;
+    }
+  }
+}
+
 function updateVisionQualityPolling() {
   if (visionQualityTimer !== null) {
     window.clearInterval(visionQualityTimer);
@@ -476,6 +663,26 @@ function updateVisionQualityPolling() {
   visionQualityTimer = window.setInterval(() => {
     refreshVisionQuality();
   }, 1000);
+}
+
+function updateLogsPolling() {
+  if (logsTimer !== null) {
+    window.clearInterval(logsTimer);
+    logsTimer = null;
+  }
+  if (state.activeTab !== 'logs') {
+    return;
+  }
+  if (!state.logsContent && !state.logsError) {
+    refreshLogs();
+  }
+  if (!state.logsAutoRefresh) {
+    return;
+  }
+  refreshLogs();
+  logsTimer = window.setInterval(() => {
+    refreshLogs();
+  }, 3000);
 }
 
 async function refreshAll({ flash = false } = {}) {
@@ -496,6 +703,7 @@ async function refreshAll({ flash = false } = {}) {
   updateTopbar();
   renderSettings();
   renderVisionQuality();
+  renderLogsPanel();
   renderSummary();
   renderError(servicesPayload.summary);
 
