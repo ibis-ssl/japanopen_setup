@@ -2,15 +2,10 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ENV_FILE="${ROOT_DIR}/.env"
-
-if [[ ! -f "${ENV_FILE}" ]]; then
-  ENV_FILE="${ROOT_DIR}/.env.example"
-fi
 
 compose() {
   docker compose \
-    --env-file "${ENV_FILE}" \
+    -p japanopen-ssl \
     -f "${ROOT_DIR}/compose.yaml" \
     --project-directory "${ROOT_DIR}" \
     "$@"
@@ -28,6 +23,7 @@ Commands:
   restart  Restart all or selected services
   logs     Follow logs for all or selected services
   ps       Show service status
+  config   Render resolved Compose configuration
 EOF
 }
 
@@ -59,6 +55,9 @@ case "${command}" in
     ;;
   ps)
     compose ps "$@"
+    ;;
+  config)
+    compose config "$@"
     ;;
   *)
     usage

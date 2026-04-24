@@ -17,7 +17,7 @@ services:
       - --host
       - 127.0.0.1
       - --port
-      - "${ADMIN_UI_PORT}"
+      - "8080"
       - --reload
       - --reload-dir
       - /workspace/admin_server
@@ -26,93 +26,93 @@ services:
       WORKSPACE_DIR: /workspace
       HOST_PROC_ASOUND: /host/proc/asound
     volumes:
-      - .:/workspace:rw
+      - .:/workspace:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - /proc/asound:/host/proc/asound:ro
 
   ssl-game-controller:
     <<: *host_service
-    image: robocupssl/ssl-game-controller:${SSL_GAME_CONTROLLER_TAG}
+    image: robocupssl/ssl-game-controller:3.20.3
     command:
       - -visionAddress
-      - ${VISION_ADDRESS}:${VISION_PORT}
+      - 224.5.23.2:10006
       - -trackerAddress
-      - ${TRACKER_ADDRESS}:${TRACKER_PORT}
+      - 224.5.23.2:10010
       - -publishAddress
-      - ${REFEREE_ADDRESS}:${REFEREE_PORT}
+      - 224.5.23.1:10003
       - -address
-      - :${GC_UI_PORT}
+      - :8081
     volumes:
       - ./config:/config:ro
       - ./data/gc:/data:rw
 
   ssl-vision-client:
     <<: *host_service
-    image: robocupssl/ssl-vision-client:${SSL_VISION_CLIENT_TAG}
+    image: robocupssl/ssl-vision-client:2.1.0
     command:
       - -address
-      - :${VISION_CLIENT_UI_PORT}
+      - :8082
     volumes:
       - ./config/ssl-vision-client.json:/config.json:ro
 
   ssl-status-board:
     <<: *host_service
-    image: robocupssl/ssl-status-board:${SSL_STATUS_BOARD_TAG}
+    image: robocupssl/ssl-status-board:2.18.0
     command:
       - -address
-      - :${STATUS_BOARD_UI_PORT}
+      - :8083
       - -refereeAddress
-      - ${REFEREE_ADDRESS}:${REFEREE_PORT}
+      - 224.5.23.1:10003
 
   ssl-remote-control-yellow:
     <<: *host_service
-    image: robocupssl/ssl-remote-control:${SSL_REMOTE_CONTROL_TAG}
+    image: robocupssl/ssl-remote-control:1.4.3
     command:
       - -address
-      - :${REMOTE_CONTROL_YELLOW_UI_PORT}
+      - :8084
       - -refereeAddress
-      - ${REFEREE_ADDRESS}:${REFEREE_PORT}
+      - 224.5.23.1:10003
       - -team
       - YELLOW
 
   ssl-remote-control-blue:
     <<: *host_service
-    image: robocupssl/ssl-remote-control:${SSL_REMOTE_CONTROL_TAG}
+    image: robocupssl/ssl-remote-control:1.4.3
     command:
       - -address
-      - :${REMOTE_CONTROL_BLUE_UI_PORT}
+      - :8085
       - -refereeAddress
-      - ${REFEREE_ADDRESS}:${REFEREE_PORT}
+      - 224.5.23.1:10003
       - -team
       - BLUE
 
   autoref-tigers:
     <<: *host_service
-    image: tigersmannheim/auto-referee:${TIGERS_AUTOREF_TAG}
+    image: tigersmannheim/auto-referee:1.7.1-12-g39cac863
     command:
       - -a
       - -hl
       - --visionAddress
-      - ${VISION_ADDRESS}:${VISION_PORT}
+      - 224.5.23.2:10006
       - --refereeAddress
-      - ${REFEREE_ADDRESS}:${REFEREE_PORT}
+      - 224.5.23.1:10003
       - --trackerAddress
-      - ${TRACKER_ADDRESS}:${TRACKER_PORT}
+      - 224.5.23.2:10010
 
   autoref-erforce:
     <<: *host_service
-    image: roboticserlangen/autoref:${ERFORCE_AUTOREF_TAG}
+    image: roboticserlangen/autoref:2025.1.0
     command:
       - --vision-port
-      - ${VISION_PORT}
+      - "10006"
       - --tracker-port
-      - ${TRACKER_PORT}
+      - "10010"
       - --gc-port
-      - ${REFEREE_PORT}
+      - "10003"
 
   ssl-auto-recorder:
     <<: *host_service
-    image: robocupssl/ssl-auto-recorder:${SSL_AUTO_RECORDER_TAG}
+    image: robocupssl/ssl-auto-recorder:1.11.0
     stop_signal: SIGINT
     stop_grace_period: 30s
     working_dir: /logs
@@ -120,11 +120,11 @@ services:
       - -output-folder
       - /logs
       - -referee-address
-      - ${REFEREE_ADDRESS}:${REFEREE_PORT}
+      - 224.5.23.1:10003
       - -vision-address
-      - ${VISION_ADDRESS}:${VISION_PORT}
+      - 224.5.23.2:10006
       - -vision-tracker-address
-      - ${TRACKER_ADDRESS}:${TRACKER_PORT}
+      - 224.5.23.2:10010
       - -vision-legacy-enabled=false
       - -http-serve=false
     volumes:
@@ -136,15 +136,15 @@ services:
       context: .
       dockerfile: docker/ssl-playback/Dockerfile
       args:
-        SSL_GC_PROTO_REF: ${SSL_GC_PROTO_REF:-v3.20.3}
+        SSL_GC_PROTO_REF: v3.20.3
     environment:
-      VISION_ADDRESS: ${VISION_ADDRESS}
-      VISION_PORT: ${VISION_PORT}
-      TRACKER_ADDRESS: ${TRACKER_ADDRESS}
-      TRACKER_PORT: ${TRACKER_PORT}
-      REFEREE_ADDRESS: ${REFEREE_ADDRESS}
-      REFEREE_PORT: ${REFEREE_PORT}
-      PLAYBACK_UI_PORT: ${PLAYBACK_UI_PORT}
+      VISION_ADDRESS: 224.5.23.2
+      VISION_PORT: "10006"
+      TRACKER_ADDRESS: 224.5.23.2
+      TRACKER_PORT: "10010"
+      REFEREE_ADDRESS: 224.5.23.1
+      REFEREE_PORT: "10003"
+      PLAYBACK_UI_PORT: "8086"
       PLAYBACK_BUFFER_SECONDS: "60"
     volumes:
       - ./ssl_playback:/app/ssl_playback:ro
@@ -156,16 +156,16 @@ services:
       context: .
       dockerfile: docker/audioref/Dockerfile
       args:
-        AUDIOREF_REF: ${AUDIOREF_REF}
-    image: japanopen-ssl/audioref:${AUDIOREF_REF}
+        AUDIOREF_REF: 27e893fc8f06801c91a49f6a03e0b6ceafd6a07f
+    image: japanopen-ssl/audioref:27e893fc8f06801c91a49f6a03e0b6ceafd6a07f
     devices:
       - /dev/snd:/dev/snd
     environment:
-      REFEREE_ADDRESS: ${REFEREE_ADDRESS}
-      REFEREE_PORT: ${REFEREE_PORT}
-      VISION_ADDRESS: ${VISION_ADDRESS}
-      VISION_PORT: ${VISION_PORT}
-      AUDIOREF_PACK_DIR: ${AUDIOREF_PACK_DIR}
-      AUDIOREF_OUTPUT_PCM: ${AUDIOREF_OUTPUT_PCM}
-      AUDIOREF_MAX_QUEUE_LEN: ${AUDIOREF_MAX_QUEUE_LEN}
-      AUDIOREF_ANTI_STANDBY_SOUND: ${AUDIOREF_ANTI_STANDBY_SOUND}
+      REFEREE_ADDRESS: 224.5.23.1
+      REFEREE_PORT: "10003"
+      VISION_ADDRESS: 224.5.23.2
+      VISION_PORT: "10006"
+      AUDIOREF_PACK_DIR: /opt/audioref/sounds/en
+      AUDIOREF_OUTPUT_PCM: default
+      AUDIOREF_MAX_QUEUE_LEN: "3"
+      AUDIOREF_ANTI_STANDBY_SOUND: "false"

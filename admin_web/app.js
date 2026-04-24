@@ -4,7 +4,6 @@ const state = {
   settings: null,
   outputs: [],
   activeTab: 'game-controller',
-  settingsBusy: false,
 };
 
 const tabRail = document.getElementById('tab-rail');
@@ -150,27 +149,23 @@ function createSettingsPanel() {
     <div class="panel__body">
       <section class="settings-card">
         <h3>AudioRef Output</h3>
-        <p>一覧はホストの <code>/proc/asound</code> から生成しています。<code>default</code> はホスト既定の出力先を使います。</p>
-        <form id="audioref-form">
-          <div class="form-grid">
-            <div>
-              <label class="field-label" for="output-pcm">PCM Output</label>
-              <select class="select-input" id="output-pcm" name="outputPcm"></select>
-              <div class="field-help" id="output-help"></div>
-            </div>
+        <p>現在値は <code>compose.yaml</code> の <code>audioref</code> service から読み取っています。変更はホスト側で編集してから AudioRef を再作成してください。</p>
+        <div class="form-grid">
+          <div>
+            <label class="field-label" for="output-pcm">Detected PCM Outputs</label>
+            <select class="select-input" id="output-pcm" name="outputPcm"></select>
+            <div class="field-help" id="output-help"></div>
           </div>
-          <div class="form-actions">
-            <button class="solid-button" type="submit" id="save-button">Save And Recreate AudioRef</button>
-            <button class="ghost-button" type="button" id="reload-button">Reload Status</button>
-          </div>
-        </form>
+        </div>
+        <div class="form-actions">
+          <button class="ghost-button" type="button" id="reload-button">Reload Status</button>
+        </div>
         <div class="flash" id="settings-flash" hidden></div>
       </section>
     </div>
   `;
 
-  panel.querySelector('#audioref-form').addEventListener('submit', handleSettingsSubmit);
-  panel.querySelector('#reload-button').addEventListener('click', () => refreshAll({ flash: false }));
+  panel.querySelector('#reload-button').addEventListener('click', () => refreshAll({ flash: true }));
   return panel;
 }
 
@@ -216,7 +211,7 @@ function ensureCustomOutputOption(select, value) {
   if (!hasOption && value) {
     const option = document.createElement('option');
     option.value = value;
-    option.textContent = `${value} (saved value)`;
+    option.textContent = `${value} (compose value)`;
     select.appendChild(option);
   }
 }
@@ -229,7 +224,6 @@ function renderSettings() {
 
   const select = panel.querySelector('#output-pcm');
   const help = panel.querySelector('#output-help');
-  const saveButton = panel.querySelector('#save-button');
   const reloadButton = panel.querySelector('#reload-button');
   const preservedValue = select.value;
 
@@ -244,10 +238,9 @@ function renderSettings() {
   const currentValue = state.settings.audioref.outputPcm;
   ensureCustomOutputOption(select, currentValue);
   select.value = currentValue || preservedValue || 'default';
-  help.textContent = `Current saved value: ${currentValue}`;
+  help.textContent = `Current compose value: ${currentValue}`;
 
-  saveButton.disabled = state.settingsBusy;
-  reloadButton.disabled = state.settingsBusy;
+  reloadButton.disabled = false;
 }
 
 function renderSummary() {
@@ -308,31 +301,6 @@ async function refreshAll({ flash = false } = {}) {
 
   if (flash) {
     showFlash('状態を更新しました。');
-  }
-}
-
-async function handleSettingsSubmit(event) {
-  event.preventDefault();
-  const select = document.getElementById('output-pcm');
-  const outputPcm = select.value;
-
-  state.settingsBusy = true;
-  renderSettings();
-  showFlash('AudioRef を再作成しています...', 'success');
-
-  try {
-    await fetchJson('/api/settings/audioref', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ outputPcm }),
-    });
-    await refreshAll();
-    showFlash(`AUDIOREF_OUTPUT_PCM を ${outputPcm} に更新しました。`);
-  } catch (error) {
-    showFlash(error.message, 'error');
-  } finally {
-    state.settingsBusy = false;
-    renderSettings();
   }
 }
 

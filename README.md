@@ -29,7 +29,7 @@ RoboCup Japan Open の SSL 運営 PC 向け Docker Compose 構成。試合制御
 ./scripts/ops.sh logs [service-name]
 ```
 
-設定を変更したい場合は `.env.example` を `.env` にコピーして編集します。既定値のままでよければそのまま起動できます。
+設定を変更したい場合は `compose.yaml` をホスト側で編集します。既定値のままでよければそのまま起動できます。
 
 管理画面は起動後に <http://127.0.0.1:8080> で開きます。
 
@@ -63,7 +63,13 @@ RoboCup Japan Open の SSL 運営 PC 向け Docker Compose 構成。試合制御
 
 公式 Docker イメージが存在しないため、`TIGERs-Mannheim/AudioRef`（コミット `27e893fc` 固定）をローカルビルドして使用します。
 
-出力先は `.env` の `AUDIOREF_OUTPUT_PCM` で指定します（既定: `default` = ホストの Analog/Speaker 系を自動検出）。管理画面の Settings タブから `plughw:<card>,<device>` 形式で選択・保存すると `audioref` コンテナが再作成されて即時反映されます。
+出力先は `compose.yaml` の `audioref` service にある `AUDIOREF_OUTPUT_PCM` で指定します（既定: `default` = ホストの Analog/Speaker 系を自動検出）。管理画面の Settings タブではホストから検出した `plughw:<card>,<device>` 形式の候補と現在値を確認できます。
+
+出力先を変更した後は、ホスト側で次のように `audioref` コンテナを再作成します。
+
+```bash
+./scripts/ops.sh up --force-recreate audioref
+```
 
 その他の調整可能な変数: `AUDIOREF_PACK_DIR` / `AUDIOREF_MAX_QUEUE_LEN` / `AUDIOREF_ANTI_STANDBY_SOUND`
 
@@ -71,7 +77,6 @@ RoboCup Japan Open の SSL 運営 PC 向け Docker Compose 構成。試合制御
 
 ```
 compose.yaml          本番構成
-.env.example          環境変数の既定値
 config/               GC・チーム設定（Git 管理）
 data/                 GC state・公式ログ（Git 管理外）
 scripts/ops.sh        運用ラッパ
