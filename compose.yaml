@@ -1,6 +1,5 @@
 x-host-service: &host_service
   network_mode: host
-  restart: unless-stopped
 
 services:
   admin-ui:
