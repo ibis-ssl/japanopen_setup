@@ -49,4 +49,4 @@ COPY ssl_playback /app/ssl_playback
 
 ENV PYTHONPATH="/app/proto_gen"
 
-CMD ["sh", "-c", "exec python -m uvicorn ssl_playback.app:app --host 127.0.0.1 --port ${PLAYBACK_UI_PORT:-8086} --log-level info"]
+CMD ["sh", "-c", "exec python -m uvicorn ssl_playback.app:app --host 0.0.0.0 --port ${PLAYBACK_UI_PORT:-8086} --log-level info"]

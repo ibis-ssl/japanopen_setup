@@ -31,7 +31,7 @@ RoboCup Japan Open の SSL 運営 PC 向け Docker Compose 構成。試合制御
 
 設定を変更したい場合は `compose.yaml` をホスト側で編集します。既定値のままでよければそのまま起動できます。
 
-管理画面は起動後に <http://127.0.0.1:8080> で開きます。
+管理画面は起動後に <http://localhost:8080> で開きます。LAN 内の別 PC から開く場合は `localhost` を運営 PC の IP（例: `http://192.168.x.y:8080`）に置き換えてアクセスしてください。
 
 ## サービス一覧
 
@@ -43,7 +43,7 @@ RoboCup Japan Open の SSL 運営 PC 向け Docker Compose 構成。試合制御
 | `ssl-remote-control-yellow` | Yellow リモコン | <http://localhost:8084> |
 | `ssl-remote-control-blue` | Blue リモコン | <http://localhost:8085> |
 | `ssl-playback` | POSSIBLE_GOAL 判定用プレイバック | <http://localhost:8086> |
-| `admin-ui` | 管理画面 | <http://127.0.0.1:8080> |
+| `admin-ui` | 管理画面 | <http://localhost:8080> |
 | `autoref-erforce` | ER-Force AutoRef | — |
 | `ssl-auto-recorder` | 公式ログ自動記録 | `data/logs/auto-recorder/` |
 | `audioref` | 音声案内 | `/dev/snd` 使用 |

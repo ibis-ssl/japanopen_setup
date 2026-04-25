@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -239,17 +239,18 @@ def service_port(service: ServiceDef, compose_services: dict[str, dict[str, Any]
     return None
 
 
-def service_url(service: ServiceDef, compose_services: dict[str, dict[str, Any]]) -> str | None:
+def service_url(service: ServiceDef, compose_services: dict[str, dict[str, Any]], host: str) -> str | None:
     port = service_port(service, compose_services)
     if not port:
         return None
-    return f"http://127.0.0.1:{port}{service.path}"
+    return f"http://{host}:{port}{service.path}"
 
 
 def service_state_payload(
     service: ServiceDef,
     compose_services: dict[str, dict[str, Any]],
     containers_by_service: dict[str, dict[str, Any]],
+    host: str,
 ) -> dict[str, Any]:
     container = containers_by_service.get(service.service)
     state = "not-created"
@@ -270,7 +271,7 @@ def service_state_payload(
         "tabId": service.tab_id,
         "embeddable": service.embeddable,
         "summary": service.summary,
-        "url": service_url(service, compose_services),
+        "url": service_url(service, compose_services, host),
         "state": state,
         "statusText": status_text,
         "health": health,
@@ -317,13 +318,13 @@ def load_compose_state() -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]
     return compose_services, containers, "; ".join(errors) or None
 
 
-def list_services_payload() -> dict[str, Any]:
+def list_services_payload(host: str) -> dict[str, Any]:
     compose_services, containers, error = load_compose_state()
     containers_by_service = {
         item.get("Service"): item for item in containers if item.get("Service")
     }
     services = [
-        service_state_payload(service, compose_services, containers_by_service)
+        service_state_payload(service, compose_services, containers_by_service, host)
         for service in SERVICE_DEFS
     ]
     running_count = sum(1 for service in services if service["state"] == "running")
@@ -418,11 +419,11 @@ def playback_vision_quality_url() -> str:
 
     compose_services = load_compose_services()
     playback = next(service for service in SERVICE_DEFS if service.service == "ssl-playback")
-    base_url = service_url(playback, compose_services)
-    if not base_url:
+    port = service_port(playback, compose_services)
+    if not port:
         raise HTTPException(status_code=503, detail="ssl-playback URL is not configured")
 
-    _PLAYBACK_VISION_QUALITY_URL = f"{base_url.rstrip('/')}/api/vision-quality"
+    _PLAYBACK_VISION_QUALITY_URL = f"http://127.0.0.1:{port}/api/vision-quality"
     return _PLAYBACK_VISION_QUALITY_URL
 
 
@@ -502,8 +503,9 @@ async def healthz() -> dict[str, Any]:
 
 
 @app.get("/api/services")
-async def get_services() -> dict[str, Any]:
-    return list_services_payload()
+async def get_services(request: Request) -> dict[str, Any]:
+    host = request.url.hostname or "localhost"
+    return list_services_payload(host)
 
 
 @app.get("/api/settings")
